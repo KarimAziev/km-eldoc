@@ -1,0 +1,58 @@
+#+OPTIONS: ^:nil tags:nil num:nil
+
+* About
+
+Miscellaneous utils for eldoc.
+
+* Table of Contents                                       :TOC_2_gh:QUOTE:
+#+BEGIN_QUOTE
+- [[#about][About]]
+- [[#requirements][Requirements]]
+- [[#installation][Installation]]
+  - [[#with-use-package-and-straightel][With use-package and straight.el]]
+  - [[#manual-installation][Manual installation]]
+- [[#usage][Usage]]
+#+END_QUOTE
+
+* Requirements
+
+| Name  | Version |
+|-------+---------|
+| Emacs |    27.1 |
+
+
+* Installation
+
+** With use-package and straight.el
+#+begin_src elisp :eval no
+(use-package km-eldoc
+  :straight (km-eldoc
+             :repo "KarimAziev/km-eldoc"
+             :type git
+             :host github))
+#+end_src
+
+** Manual installation
+
+Download the source code and put it wherever you like, e.g. into =~/.emacs.d/km-eldoc/=
+
+#+begin_src shell :eval no
+git clone https://github.com/KarimAziev/km-eldoc.git ~/.emacs.d/km-eldoc/
+#+end_src
+
+Add the downloaded directory to the load path:
+
+#+begin_src elisp :eval no
+(add-to-list 'load-path "~/.emacs.d/km-eldoc/")
+(require 'km-eldoc)
+#+end_src
+
+* Usage
+
+You can use =km-eldoc-prettify-doc-buffer-args= to advise =eldoc--format-doc-buffer= to format "&nbsp;" entities to display them as spaces.
+
+#+begin_src elisp
+(require 'km-eldoc)
+(advice-add 'eldoc--format-doc-buffer :filter-args
+            #'km-eldoc-prettify-doc-buffer-args)
+#+end_src
