@@ -30,17 +30,72 @@
 
 ;;; Code:
 
+(defcustom km-eldoc-filter-args-functions '(km-eldoc--remove-html-entities
+                                            km-eldoc--propertize-asterixes)
+  "List of functions to filter and transform documentation strings.
 
-(defun km-eldoc--replace-nbsp (args)
-  "Convert nested lists of strings by replacing \"&nbsp;\" with a space.
+A list of functions to filter and transform argument strings for
+`km-eldoc'. Each function will be called in the temp buffer without arguments."
+  :group 'km-eldoc
+  :type 'hook)
 
-Argument ARGS is a list or string to be processed and converted."
-  (pcase args
+
+(defun km-eldoc--remove-html-entities ()
+  "Replace all occurrences of \"&nbsp;\" with an empty string."
+  (save-excursion
+    (goto-char (point-max))
+    (while (re-search-backward "&nbsp;" nil t 1)
+      (replace-match ""))))
+
+
+(defun km-eldoc--propertize-asterixes ()
+  "Propertize text between double asterisks with a bold face."
+  (save-excursion
+    (goto-char (point-max))
+    (let ((regex "\\([*][*]\\)\\([a-z0-9_-][^*]+\\)\\([*][*]\\)"))
+      (while (re-search-backward regex nil t 1)
+        (let ((str (match-string 2))
+              (beg (match-beginning 0))
+              (end (match-end 0)))
+          (delete-region beg end)
+          (add-face-text-property 0 (length str) 'bold nil str)
+          (insert str))))))
+
+(defun km-eldoc--map-nested-list-of-strings (fn list-of-strings)
+  "Apply FN to each string in LIST-OF-STRINGS, handling nested lists and vectors.
+
+Argument FN is a function to apply to each string in the nested list.
+
+Argument LIST-OF-STRINGS is a nested list or vector of strings to process."
+  (pcase list-of-strings
     ((pred stringp)
-     (replace-regexp-in-string "&nbsp;" "  " args))
+     (funcall fn list-of-strings))
     ((pred (proper-list-p))
-     (mapcar #'km-eldoc--replace-nbsp args))
-    (_ args)))
+     (mapcar (apply-partially #'km-eldoc--map-nested-list-of-strings fn)
+             list-of-strings))
+    ((pred (vectorp))
+     (apply #'vector
+            (mapcar (apply-partially #'km-eldoc--map-nested-list-of-strings fn)
+                    list-of-strings)))
+    (_ list-of-strings)))
+
+(defun km-eldoc--transform-doc-buffer-arg (str)
+  "Transform documentation string STR using filter functions if available.
+
+Argument STR is the documentation string to be transformed."
+  (if km-eldoc-filter-args-functions
+      (with-temp-buffer (insert str)
+                        (run-hooks 'km-eldoc-filter-args-functions)
+                        (buffer-string))
+    str))
+
+(defun km-eldoc--transform-doc-buffer-args (args)
+  "Transform each string in the nested list ARGS using a specific function.
+
+Argument ARGS is a nested list or vector of strings to process."
+  (km-eldoc--map-nested-list-of-strings
+   #'km-eldoc--transform-doc-buffer-arg
+   args))
 
 (defun km-eldoc-prettify-doc-buffer-args (args)
   "Return a list of prettified documentation strings from ARGS.
@@ -60,8 +115,7 @@ Usage:
 \\=(advice-add \\='eldoc--format-doc-buffer :filter-args
             #\\='km-eldoc-prettify-doc-buffer-args)"
   (let ((docs (car args)))
-    (list (mapcar #'km-eldoc--replace-nbsp
-                  docs))))
+    (list (km-eldoc--transform-doc-buffer-args docs))))
 
 
 (provide 'km-eldoc)
